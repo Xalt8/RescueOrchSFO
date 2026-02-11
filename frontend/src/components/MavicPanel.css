@@ -1,0 +1,204 @@
+.mavic-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mavic-panel .panel-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mavic-panel h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.status-dot.ok {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.status-dot.err {
+  background: var(--accent-red);
+}
+
+.status-text.flying {
+  color: var(--accent-amber);
+}
+
+.error-banner {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.camera-feed {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.camera-view {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  aspect-ratio: 400 / 240;
+  display: block;
+  background: var(--bg-dark);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.camera-label {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 1.5rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mavic-panel .controls {
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mavic-panel .btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.mavic-panel .btn:hover {
+  opacity: 0.9;
+}
+
+.btn-takeoff {
+  background: var(--accent-green);
+  color: var(--bg-dark);
+}
+
+.btn-land {
+  background: var(--accent-red);
+  color: white;
+}
+
+.btn-hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.joystick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 0.25rem;
+  max-width: 160px;
+  margin: 0 auto;
+}
+
+.joy-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.joy-btn:hover {
+  border-color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.joy-btn.active {
+  background: var(--accent-amber);
+  color: var(--bg-dark);
+  border-color: var(--accent-amber);
+}
+
+.center-cell {
+  background: var(--bg-panel);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.altitude-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.altitude-control label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.alt-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.alt-buttons button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.alt-buttons button:hover {
+  border-color: var(--accent-amber);
+}
+
+.alt-value {
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 3ch;
+  text-align: center;
+}
