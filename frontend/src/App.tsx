@@ -14,7 +14,13 @@ function App() {
           <MavicPanel />
         </section>
         <section className="panel tiago-panel">
-          <TiagoPanel />
+          <TiagoPanel robotId="1" robotName="Tiago #1" />
+        </section>
+        <section className="panel tiago-panel">
+          <TiagoPanel robotId="2" robotName="Tiago #2" />
+        </section>
+        <section className="panel tiago-panel">
+          <TiagoPanel robotId="3" robotName="Tiago #3" />
         </section>
       </main>
     </div>

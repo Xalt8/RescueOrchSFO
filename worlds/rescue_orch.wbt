@@ -14,7 +14,6 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/trees/protos/Pine.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/trees/protos/Forest.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/dji/mavic/protos/Mavic2Pro.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/pal_robotics/tiago_base/protos/TiagoBase.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/cabinet/protos/Cabinet.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/cabinet/protos/CabinetHandle.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/PaintedWood.proto"
@@ -52,6 +51,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/kitchen/breakfast/protos/JamJar.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/kitchen/breakfast/protos/CerealBox.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/kitchen/breakfast/protos/BiscuitBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/pal_robotics/tiagopp/protos/Tiago++.proto"
 
 WorldInfo {
   info [
@@ -67,7 +67,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation -0.07604412751957206 0.04387722346141002 0.9961385847014985 1.8746135281330587
-  position 0.8632447422119038 -2.488616908298136 0.8800793728715535
+  position 1.685909898892786 -5.157519836299791 1.2757684354927845
   near 0.2
   follow "Mavic 2 PRO"
   followSmoothness 0.2
@@ -1306,8 +1306,17 @@ Mavic2Pro {
     }
   ]
 }
-TiagoBase {
-  translation -0.000185557 1.98051 0.095
-  rotation -0.9063342529456766 -0.4225604875449615 -0.0009253665040379879 0.005727776407955761
-  controller "tiago_api"
+Tiago++ {
+  translation 0.66 5.81 0.095
+  controller "tiago_api_1"
+}
+Tiago++ {
+  translation 1.36 -7.28 0.095
+  name "TIAGo++(1)"
+  controller "tiago_api_2"
+}
+Tiago++ {
+  translation 3.5 0 0.095
+  name "TIAGo++(2)"
+  controller "tiago_api_3"
 }
