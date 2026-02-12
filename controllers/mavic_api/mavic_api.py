@@ -11,12 +11,24 @@ DEFAULT_API = "http://127.0.0.1:8000"
 CAMERA_SAMPLE_PERIOD_MS = 128
 
 
+# def fetch_command(api_url):
+#     try:
+#         req = urllib.request.Request(f"{api_url}/mavic/command")
+#         with urllib.request.urlopen(req, timeout=0.5) as resp:
+#             return json.loads(resp.read().decode())
+#     except (urllib.error.URLError, OSError, json.JSONDecodeError):
+#         return None
+
 def fetch_command(api_url):
     try:
         req = urllib.request.Request(f"{api_url}/mavic/command")
+        print(f"[mavic_api] Polling {api_url}/mavic/command")  # DEBUG
         with urllib.request.urlopen(req, timeout=0.5) as resp:
-            return json.loads(resp.read().decode())
-    except (urllib.error.URLError, OSError, json.JSONDecodeError):
+            cmd = json.loads(resp.read().decode())
+            print(f"[mavic_api] Received: {cmd}")  # DEBUG
+            return cmd
+    except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+        print(f"[mavic_api] Connection error: {e}")  # DEBUG
         return None
 
 
