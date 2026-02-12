@@ -41,7 +41,8 @@ BACKEND_PID=$!
 cd "$ROOT/frontend"
 [ ! -d "node_modules" ] && npm install
 echo "Starting frontend on http://localhost:5173"
-npm run dev &
+# npm run dev &
+npm run dev -- --host 0.0.0.0 &
 FRONTEND_PID=$!
 
 echo ""

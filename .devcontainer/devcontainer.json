@@ -1,0 +1,7 @@
+{
+  "name": "Spot-X",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "vscode"
+}
