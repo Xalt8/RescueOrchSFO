@@ -70,6 +70,13 @@ class TiagoActionCommand(BaseModel):
     action: str = Field(..., description="One of: stop, home_arms, open_gripper, close_gripper")
 
 
+
+class TiagoPositionUpdate(BaseModel):
+    """Position update for Tiago robot."""
+    x: float
+    y: float
+    z: float
+
 class TiagoStatus(BaseModel):
     """Current Tiago status."""
     connected: bool = False

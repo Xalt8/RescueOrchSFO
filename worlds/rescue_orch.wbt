@@ -1306,17 +1306,25 @@ Mavic2Pro {
     }
   ]
 }
-Tiago++ {
+DEF TIAGO_1 Tiago++ {
   translation 0.66 5.81 0.095
   controller "tiago_api_1"
 }
-Tiago++ {
+
+DEF TIAGO_2 Tiago++ {
   translation 1.36 -7.28 0.095
   name "TIAGo++(1)"
   controller "tiago_api_2"
 }
-Tiago++ {
+
+DEF TIAGO_3 Tiago++ {
   translation 3.5 0 0.095
   name "TIAGo++(2)"
   controller "tiago_api_3"
+}
+
+Robot {
+  name "PositionTracker"
+  controller "position_tracker"
+  supervisor TRUE
 }

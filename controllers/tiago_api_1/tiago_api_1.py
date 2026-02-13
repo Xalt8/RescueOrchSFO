@@ -23,6 +23,13 @@ def main():
     robot = Robot()
     timestep = int(robot.getBasicTimeStep())
 
+    # ADD THESE LINES:
+    print("=== Tiago_1++ Devices ===")
+    for i in range(robot.getNumberOfDevices()):
+        dev = robot.getDeviceByIndex(i)
+        print(f"Device {i}: {dev.getName()}")
+    print("========================")
+
     # Base wheels
     wheel_left = robot.getDevice("wheel_left_joint")
     wheel_right = robot.getDevice("wheel_right_joint")
@@ -142,6 +149,18 @@ def main():
                             gripper.setPosition(0.045)  # Open position
                         elif action == "close":
                             gripper.setPosition(0.0)  # Closed position
+
+
+        # --- Send position to backend with debug print ---
+      
+        # try:
+        #     data = json.dumps({"x": pos[0], "y": pos[1], "z": pos[2]}).encode("utf-8")
+        #     req = urllib.request.Request(f"{api_url}/tiago/1/position", data=data, method="POST")
+        #     req.add_header("Content-Type", "application/json")
+        #     resp = urllib.request.urlopen(req, timeout=0.5)
+        #     print(f"[tiago_api_1] Sent position: {pos}, Response: {resp.status}")
+        # except Exception as e:
+        #     print(f"[tiago_api_1] Failed to send position: {pos}, Error: {e}")
 
         # Differential drive: v_left = linear - angular * L/2, v_right = linear + angular * L/2
         # Convert m/s to rad/s: omega = v / r

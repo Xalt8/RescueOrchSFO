@@ -31,12 +31,31 @@ async def get_all_tiago_status(robot_ids:list[str]=["1", "2", "3"]):
         return {robot_ids[i]: responses[i].json() for i in range(len(robot_ids))}
 
 
+async def move_tiago(robot_id: str, velocity: dict):
+    """Command a specific Tiago robot to move with given velocity."""
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{DEFAULT_API}/tiago/{robot_id}/velocity", json=velocity)
+        response.raise_for_status()
+        return response.json()
+
 
 if __name__ == "__main__":
     
     
     robot_status = asyncio.run(get_all_tiago_status())
     print(robot_status)
+
+    status = asyncio.run(get_tiago_status(robot_id="1"))
+    print(f"before {status = }")
+
+    velocity = {"linear_x": 0.5, "linear_y": 0.0, "angular": 0.0}
+
+    asyncio.run(move_tiago(robot_id="1", velocity=velocity))
+    asyncio.run(asyncio.sleep(2))  # wait for command to take effect
+
+    status = asyncio.run(get_tiago_status(robot_id="1"))
+    print(f"after {status =}")
+
 
     door_loc = asyncio.run(get_door_position())
     print(door_loc)

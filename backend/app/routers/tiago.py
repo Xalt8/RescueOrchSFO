@@ -9,9 +9,25 @@ from app.schemas import (
     TiagoGripperCommand,
     TiagoActionCommand,
     TiagoStatus,
+    TiagoPositionUpdate,
 )
 
+# --- New endpoint: update Tiago position ---
+from fastapi import Body
+
 router = APIRouter(prefix="/tiago", tags=["Tiago Robot"])
+
+
+@router.post("/{robot_id}/position")
+@router.post("/position")
+def update_tiago_position(
+    pos: TiagoPositionUpdate = Body(...), robot_id: str = "1"
+):
+    """Update Tiago's real position (called by controller)."""
+    state = _get_state(robot_id)
+    state["position"] = {"x": pos.x, "y": pos.y, "z": pos.z}
+    return {"status": "ok", "position": state["position"], "robot_id": robot_id}
+
 
 # In-memory state for multiple Tiago robots (replace with Webots controller integration)
 _states = {
