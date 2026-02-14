@@ -25,7 +25,7 @@ def update_tiago_position(
 ):
     """Update Tiago's real position (called by controller)."""
     state = _get_state(robot_id)
-    state["position"] = {"x": pos.x, "y": pos.y, "z": pos.z}
+    state["position"] = {"x": pos.x, "y": pos.y, "z": pos.z, "yaw": pos.yaw}
     return {"status": "ok", "position": state["position"], "robot_id": robot_id}
 
 

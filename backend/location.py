@@ -44,10 +44,23 @@ async def get_all_tiago_status(robot_ids:list[str]=["1", "2", "3"]):
 
 async def move_tiago(robot_id: str, velocity: dict):
     """Command a specific Tiago robot to move with given velocity."""
+    
+    # DEBUG: Print what we're about to send
+    print(f"[DEBUG] Calling /tiago/{robot_id}/velocity with: {velocity}")
+    
     async with httpx.AsyncClient() as client:
-        response = await client.post(f"{DEFAULT_API}/tiago/{robot_id}/velocity", json=velocity)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = await client.post(
+                f"{DEFAULT_API}/tiago/{robot_id}/velocity", 
+                json=velocity
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            print(f"[ERROR] HTTP {e.response.status_code}")
+            print(f"  Response body: {e.response.text}")
+            print(f"  Sent: {velocity}")
+            raise
 
 
 async def stop_robot(robot_id: str) -> dict:
@@ -157,104 +170,66 @@ async def move_robot_to_position(
     robot_id: str,
     target_x: float,
     target_y: float,
-    speed: float = 0.3
+    speed: float = 0.5  # Increased default speed
 ) -> dict:
     """
-    Move robot using simple pursuit - turn toward target while moving.
+    Simple demo movement - just move toward target with basic correction.
     """
     print(f"[move_robot_to_position] Moving robot {robot_id} to ({target_x}, {target_y})")
     
-    # Get current position with retry
-    max_retries = 5
-    current_pos = None
-    for attempt in range(max_retries):
-        status = await get_tiago_status(robot_id)
-        current_pos = status.get("position")
-        if current_pos:
-            break
-        print(f"[Robot {robot_id}] Waiting for position data... (attempt {attempt + 1}/{max_retries})")
-        await asyncio.sleep(0.5)
+    # Get current position
+    status = await get_tiago_status(robot_id)
+    current_pos = status.get("position")
     
     if not current_pos:
-        return {
-            "success": False,
-            "error": "Could not get robot position",
-            "robot_id": robot_id
-        }
+        return {"success": False, "error": "Could not get position"}
     
-    timeout = 60.0
-    check_interval = 0.2
-    threshold = 0.3
+    timeout = 60.0  # Reduced timeout
+    threshold = 0.5  # Larger threshold - easier to reach
     start_time = asyncio.get_event_loop().time()
-    
-    # Calculate initial direction
-    dx = target_x - current_pos["x"]
-    dy = target_y - current_pos["y"]
-    distance = math.sqrt(dx**2 + dy**2)
-    
-    if distance < threshold:
-        return {
-            "success": True,
-            "message": "Already at target",
-            "distance": distance
-        }
-    
-    target_angle = math.atan2(dy, dx)
-    
-    # Phase 1: Initial turn
-    print(f"[Robot {robot_id}] Phase 1: Turning toward target (angle: {math.degrees(target_angle):.1f}°)...")
-    turn_time = min(3.0, abs(target_angle) * 2)  # Turn longer for larger angles
-    turn_start = asyncio.get_event_loop().time()
-    
-    angular_vel = 0.5 if target_angle > 0 else -0.5
-    
-    await move_tiago(robot_id, {
-        "linear_x": 0.0,
-        "linear_y": 0.0,
-        "angular": angular_vel
-    })
-    
-    while asyncio.get_event_loop().time() - turn_start < turn_time:
-        await asyncio.sleep(0.1)
-    
-    # Phase 2: Move forward with course correction
-    print(f"[Robot {robot_id}] Phase 2: Moving forward...")
     
     while True:
         elapsed = asyncio.get_event_loop().time() - start_time
+        
         if elapsed > timeout:
             await move_tiago(robot_id, {"linear_x": 0.0, "linear_y": 0.0, "angular": 0.0})
-            return {"success": False, "reason": "timeout", "elapsed_time": elapsed}
+            return {"success": False, "reason": "timeout"}
         
+        # Get current position
         status = await get_tiago_status(robot_id)
         current_pos = status.get("position")
-        
         if not current_pos:
-            await asyncio.sleep(check_interval)
+            await asyncio.sleep(0.2)
             continue
         
+        # Calculate distance and angle
         dx = target_x - current_pos["x"]
         dy = target_y - current_pos["y"]
         distance = math.sqrt(dx**2 + dy**2)
         
+        # Check if arrived
         if distance < threshold:
             await move_tiago(robot_id, {"linear_x": 0.0, "linear_y": 0.0, "angular": 0.0})
-            print(f"[Robot {robot_id}] ✓ Arrived at target!")
-            return {"success": True, "final_position": current_pos, "elapsed_time": elapsed}
+            print(f"[Robot {robot_id}] ✓ Arrived!")
+            return {"success": True, "elapsed_time": elapsed}
         
-        # Calculate target angle
+        # Simple control: point toward target and drive
         target_angle = math.atan2(dy, dx)
+        current_yaw = current_pos.get("yaw", 0) or 0
         
-        # Proportional control
-        K_angular = 0.8
-        angular_vel = K_angular * target_angle
-        angular_vel = max(-1.0, min(1.0, angular_vel))
+        heading_error = target_angle - current_yaw
+        # Normalize to [-π, π]
+        while heading_error > math.pi:
+            heading_error -= 2 * math.pi
+        while heading_error < -math.pi:
+            heading_error += 2 * math.pi
         
-        # Adjust speed based on heading error
-        if abs(target_angle) > math.radians(30):
-            linear_vel = speed * 0.3  # Go slow when off-course
-        else:
-            linear_vel = min(speed, distance * 0.5)
+        # Fast turning
+        angular_vel = 5.0 * heading_error  # High gain for fast turning
+        angular_vel = max(-3.0, min(3.0, angular_vel))  # High limit
+        
+        # Always move forward (even while turning)
+        linear_vel = speed if abs(heading_error) < math.radians(45) else speed * 0.5
         
         await move_tiago(robot_id, {
             "linear_x": linear_vel,
@@ -262,108 +237,104 @@ async def move_robot_to_position(
             "angular": angular_vel
         })
         
-        if int(elapsed / 2) % 3 == 0:
-            print(f"[Robot {robot_id}] Dist: {distance:.2f}m, heading error: {math.degrees(target_angle):.1f}°")
+        if int(elapsed * 5) % 10 == 0:  # Print occasionally
+            print(f"[Robot {robot_id}] {distance:.1f}m away, heading error: {math.degrees(heading_error):.0f}°")
         
-        await asyncio.sleep(check_interval)
+        await asyncio.sleep(0.1)  # Fast update rate
 
 
 async def llm_controlled_mission(
     system_prompt: str,
     user_prompt: str,
     client: genai.Client,
-    max_steps: int = 20
 ) -> None:
     """
-    Run a mission where the LLM controls robots with proper waiting for movement.
-    
-    The LLM has access to:
-    - move_robot_to_position: Move robot to coordinates and wait until arrived
-    - get_robot_location: Get current robot position
-    - stop_robot: Stop a robot
-    - get_door_position: Get door location
-    
-    Example usage:
-        system_prompt = '''You are a robot mission controller. 
-        You have 3 Tiago robots at your command.
-        Use move_robot_to_position to send robots to locations.
-        The function will automatically wait for the robot to arrive.'''
-        
-        user_prompt = "Send robot 1 to the door, then send robot 2 to position (5, 5)"
+    The LLM must output ALL required tool calls in a single response.
+    Movement functions already wait until completion.
     """
-    
-    # Tools available to the LLM
+
     tool_list = [
         move_robot_to_position,
         get_robot_location,
         stop_robot,
         get_door_position,
     ]
-    
+
     available_functions = {fn.__name__: fn for fn in tool_list}
-    
+
     config = types.GenerateContentConfig(
         system_instruction=system_prompt,
         tools=tool_list,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(
-            disable=True
+            disable=True  # We manually execute
         ),
         tool_config=types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(mode='ANY')
         )
     )
-    
-    chat = client.chats.create(model="gemini-2.0-flash", config=config)
-    response = chat.send_message(user_prompt)
-    
-    step = 0
-    
-    while response.function_calls and step < max_steps:
-        step += 1
-        print(f"\n{'='*60}")
-        print(f"STEP {step}/{max_steps}")
-        print(f"{'='*60}")
-        
-        tool_responses = []
-        
-        for fn in response.function_calls:
-            function_to_call = available_functions.get(fn.name)
-            
-            if function_to_call:
-                print(f"\nLLM wants to call: {fn.name}")
-                print(f"Arguments: {fn.args}")
-                
-                # Execute the function (this will WAIT if it's a movement function)
-                try:
-                    result = await function_to_call(**fn.args)
-                    print(f"Result: {result}")
-                    
-                    tool_responses.append(types.Part.from_function_response(
-                        name=fn.name,
-                        response=result
-                    ))
-                except Exception as e:
-                    print(f"Error: {e}")
-                    tool_responses.append(types.Part.from_function_response(
-                        name=fn.name,
-                        response={"error": str(e)}
-                    ))
-            else:
-                print(f"Unknown function: {fn.name}")
-        
-        # Send results back to LLM for next decision
-        response = chat.send_message(tool_responses)
-    
-    if step >= max_steps:
-        print("\n Aborting: exceeded max tool call steps.")
-    
+
+    # Single LLM call
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=user_prompt,
+        config=config
+    )
+
+    print("\n" + "="*60)
+    print("MISSION EXECUTION")
+    print("="*60)
+
+    if not response.function_calls:
+        print("No tool calls returned by LLM.")
+        if response.text:
+            print(response.text)
+        return
+
+    tool_results = []
+
+    # Execute ALL tool calls sequentially
+    for fn in response.function_calls:
+        function_to_call = available_functions.get(fn.name)
+
+        if not function_to_call:
+            print(f"Unknown function: {fn.name}")
+            continue
+
+        print(f"\nExecuting: {fn.name}")
+        print(f"Arguments: {fn.args}")
+
+        try:
+            result = await function_to_call(**fn.args)
+            print(f"Result: {result}")
+
+            tool_results.append(
+                types.Part.from_function_response(
+                    name=fn.name,
+                    response=result
+                )
+            )
+
+        except Exception as e:
+            print(f"Error: {e}")
+            tool_results.append(
+                types.Part.from_function_response(
+                    name=fn.name,
+                    response={"error": str(e)}
+                )
+            )
+
+    # Optional: one final LLM call for summary
+    final_response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=tool_results
+    )
+
     print("\n" + "="*60)
     print("Mission complete!")
     print("="*60)
-    
-    if response.text:
-        print(f"\nFinal LLM response:\n{response.text}")
 
+    if final_response.text:
+        print(f"\nFinal LLM response:\n{final_response.text}")
 
 
 
@@ -379,13 +350,13 @@ if __name__ == "__main__":
     - get_robot_location(robot_id): Get current position of a robot
     - stop_robot(robot_id): Stop a robot immediately
     - get_door_position(): Get the coordinates of the door
-    
-    When moving robots:
-    1. Check their current position first
-    2. Use move_robot_to_position - it will automatically wait for arrival
-    3. You can then proceed with the next command
-    
-    Be efficient and clear in your actions."""
+
+    IMPORTANT:
+    - Generate the COMPLETE mission plan in a single response.
+    - Assume movement functions block until arrival.
+    - Do NOT request intermediate state checks.
+    - Call all required functions in order in one response.
+    """
     
 
     door_position = get_door_position()

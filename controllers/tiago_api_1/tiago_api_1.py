@@ -11,24 +11,29 @@ WHEEL_RADIUS = 0.0985
 WHEEL_BASE = 0.4044  # distance between wheels
 
 def fetch_command(api_url, robot_id="1"):
+    print(f"[tiago_api_{robot_id}] Attempting to connect to {api_url}/tiago/{robot_id}/command")  # ADD THIS
     try:
         req = urllib.request.Request(f"{api_url}/tiago/{robot_id}/command")
         with urllib.request.urlopen(req, timeout=0.5) as resp:
             return json.loads(resp.read().decode())
-    except (urllib.error.URLError, OSError, json.JSONDecodeError):
+    except urllib.error.URLError as e:
+        print(f"[tiago_api_{robot_id}] URLError: {e}")
         return None
+    except OSError as e:
+        print(f"[tiago_api_{robot_id}] OSError: {e}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"[tiago_api_{robot_id}] JSONDecodeError: {e}")
+        return None
+
 
 
 def main():
     robot = Robot()
     timestep = int(robot.getBasicTimeStep())
 
-    # ADD THESE LINES:
-    print("=== Tiago_1++ Devices ===")
-    for i in range(robot.getNumberOfDevices()):
-        dev = robot.getDeviceByIndex(i)
-        print(f"Device {i}: {dev.getName()}")
-    print("========================")
+    print("[tiago_api_1] Controller starting!")  # ADD THIS
+    print(f"[tiago_api_1] Will poll API at: {DEFAULT_API}")  # ADD THIS
 
     # Base wheels
     wheel_left = robot.getDevice("wheel_left_joint")

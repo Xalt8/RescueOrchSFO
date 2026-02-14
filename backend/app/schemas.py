@@ -36,9 +36,9 @@ class MavicStatus(BaseModel):
 
 class TiagoVelocityCommand(BaseModel):
     """Velocity command for Tiago robot base."""
-    linear_x: float = Field(0.0, ge=-1.0, le=1.0, description="Forward/backward velocity (m/s)")
-    linear_y: float = Field(0.0, ge=-1.0, le=1.0, description="Strafe left/right velocity (m/s)")
-    angular: float = Field(0.0, ge=-1.0, le=1.0, description="Rotational velocity (rad/s)")
+    linear_x: float = Field(0.0, ge=-3.0, le=3.0, description="Forward/backward velocity (m/s)")
+    linear_y: float = Field(0.0, ge=-3.0, le=3.0, description="Strafe left/right velocity (m/s)")
+    angular: float = Field(0.0, ge=-3.0, le=3.0, description="Rotational velocity (rad/s)")
 
 
 class TiagoArmCommand(BaseModel):
@@ -76,6 +76,8 @@ class TiagoPositionUpdate(BaseModel):
     x: float
     y: float
     z: float
+    yaw: Optional[float] = None
+
 
 class TiagoStatus(BaseModel):
     """Current Tiago status."""

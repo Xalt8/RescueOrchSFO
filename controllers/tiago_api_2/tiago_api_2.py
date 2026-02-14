@@ -23,13 +23,7 @@ def main():
     robot = Robot()
     timestep = int(robot.getBasicTimeStep())
 
-    # ADD THESE LINES:
-    print("=== Tiago_2++ Devices ===")
-    for i in range(robot.getNumberOfDevices()):
-        dev = robot.getDeviceByIndex(i)
-        print(f"Device {i}: {dev.getName()}")
-    print("========================")
-
+  
     # Base wheels
     wheel_left = robot.getDevice("wheel_left_joint")
     wheel_right = robot.getDevice("wheel_right_joint")

@@ -3,18 +3,34 @@
 import json
 import urllib.request
 import urllib.error
+import math
 from controller import Supervisor
 
 DEFAULT_API = "http://127.0.0.1:8000"
 
 
-def send_position_to_api(api_url, robot_id, position):
-    """Send robot position to backend API."""
+def rotation_matrix_to_euler(rotation_matrix):
+    """Convert 3x3 rotation matrix to Euler angles (roll, pitch, yaw)."""
+    import math
+    
+    # Extract yaw (rotation around Z-axis) from rotation matrix
+    # For a rotation matrix, yaw = atan2(R[1,0], R[0,0])
+    yaw = math.atan2(rotation_matrix[3], rotation_matrix[0])
+    
+    return yaw
+
+
+def send_position_to_api(api_url, robot_id, position, rotation_matrix):
+    """Send robot position and orientation to backend API."""
     try:
+        # Get yaw angle from rotation matrix
+        yaw = rotation_matrix_to_euler(rotation_matrix)
+        
         data = json.dumps({
             "x": position[0],
             "y": position[1],
-            "z": position[2]
+            "z": position[2],
+            "yaw": yaw  # Add orientation
         }).encode("utf-8")
         
         url = f"{api_url}/tiago/{robot_id}/position"
@@ -22,7 +38,7 @@ def send_position_to_api(api_url, robot_id, position):
         req.add_header("Content-Type", "application/json")
         
         with urllib.request.urlopen(req, timeout=0.5) as resp:
-            print(f"[position_tracker] ✓ Sent robot {robot_id} pos: x={position[0]:.2f}, y={position[1]:.2f}")
+            print(f"[position_tracker] ✓ Sent robot {robot_id} pos: x={position[0]:.2f}, y={position[1]:.2f}, yaw={math.degrees(yaw):.1f}°")
             
     except urllib.error.URLError as e:
         print(f"[position_tracker] ✗ Failed to send position for robot {robot_id}: {e}")
@@ -85,18 +101,21 @@ def main():
             if step_counter % 120 == 0:  # Every ~1 second
                 print(f"[position_tracker] Heartbeat - step {step_counter}")
             
-            # Get and send positions
+            # Get and send positions with orientation
             if tiago1:
                 pos1 = tiago1.getPosition()
-                send_position_to_api(api_url, "1", pos1)
+                rot1 = tiago1.getOrientation()  # Get 3x3 rotation matrix (as 9-element list)
+                send_position_to_api(api_url, "1", pos1, rot1)
             
             if tiago2:
                 pos2 = tiago2.getPosition()
-                send_position_to_api(api_url, "2", pos2)
+                rot2 = tiago2.getOrientation()
+                send_position_to_api(api_url, "2", pos2, rot2)
             
             if tiago3:
                 pos3 = tiago3.getPosition()
-                send_position_to_api(api_url, "3", pos3)
+                rot3 = tiago3.getOrientation()
+                send_position_to_api(api_url, "3", pos3, rot3)
 
 
 if __name__ == "__main__":
