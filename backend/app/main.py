@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import mavic, tiago
+from app.routers import mavic, tiago, supervisor
 
 app = FastAPI(
     title="Rescue Command Center API",
@@ -23,6 +23,7 @@ app.add_middleware(
 
 app.include_router(mavic.router)
 app.include_router(tiago.router)
+app.include_router(supervisor.router)
 
 
 @app.get("/")

@@ -14,9 +14,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 DEFAULT_API = "http://127.0.0.1:8000"
 
-def get_door_position():
-    """Get current door position."""
-    return {"position": [7.75, -1.45, 0.0]}
+def get_object_position_position(position: list[float]) -> dict:
+    """Get current object position."""
+    position [0] = position [0] - 1.5 
+    return {"position": position}
 
 
 async def get_tiago_status(robot_id: str = "1"):
@@ -78,32 +79,6 @@ async def stop_robot(robot_id: str) -> dict:
     result = await move_tiago(robot_id, velocity)
     return {"success": True, "robot_id": robot_id}
 
-
-async def get_robot_location(robot_id: str) -> dict:
-    """
-    Get current location of a robot.
-    
-    Args:
-        robot_id: Which robot to query
-    
-    Returns:
-        dict with position data
-    """
-    status = await get_tiago_status(robot_id)
-    position = status.get("position")
-    
-    if position:
-        return {
-            "robot_id": robot_id,
-            "x": position["x"],
-            "y": position["y"],
-            "z": position["z"]
-        }
-    else:
-        return {
-            "robot_id": robot_id,
-            "error": "Position not available"
-        }
 
 
 async def wait_for_movement_complete(
@@ -243,21 +218,116 @@ async def move_robot_to_position(
         await asyncio.sleep(0.1)  # Fast update rate
 
 
-async def llm_controlled_mission(
-    system_prompt: str,
-    user_prompt: str,
-    client: genai.Client,
-) -> None:
-    """
-    The LLM must output ALL required tool calls in a single response.
-    Movement functions already wait until completion.
-    """
+async def move_robot_supervisor(
+    robot_id: str,
+    target_x: float,
+    target_y: float,
+    speed: float = 2.5
+) -> dict:
+    """Move robot using supervisor - fire and forget with estimated time."""
+    
+    # Get current position to estimate time
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DEFAULT_API}/tiago/{robot_id}/status")
+        status = response.json()
+        current_pos = status.get("position")
+    
+    if not current_pos:
+        return {"success": False, "error": "Could not get position"}
+    
+    # Calculate travel time
+    dx = target_x - current_pos["x"]
+    dy = target_y - current_pos["y"]
+    distance = math.sqrt(dx**2 + dy**2)
+    travel_time = (distance / speed) + 1.0  # Add 1 second buffer
+    
+    print(f"[Robot {robot_id}] Moving {distance:.1f}m to ({target_x:.2f}, {target_y:.2f})")
+    print(f"[Robot {robot_id}] Estimated time: {travel_time:.1f}s")
+    
+    # Send movement command
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{DEFAULT_API}/supervisor/move",
+            json={
+                "robot_id": robot_id,
+                "target": {"x": target_x, "y": target_y, "z": 0.095},
+                "speed": speed
+            }
+        )
+    
+    # Wait estimated time + buffer
+    await asyncio.sleep(travel_time)
+    
+    print(f"[Robot {robot_id}] ✓ Movement complete")
+    return {"success": True, "estimated_time": travel_time}
 
+
+async def get_robot_location(robot_id: str) -> dict:
+    """
+    Get current location of a robot.
+    
+    Args:
+        robot_id: Which robot to query ("1", "2", or "3")
+    
+    Returns:
+        dict with position data
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DEFAULT_API}/tiago/{robot_id}/status")
+        status = response.json()
+    
+    position = status.get("position")
+    
+    if position:
+        return {
+            "robot_id": robot_id,
+            "x": position["x"],
+            "y": position["y"],
+            "z": position.get("z", 0.095)
+        }
+    else:
+        return {
+            "robot_id": robot_id,
+            "error": "Position not available"
+        }
+
+
+system_prompt = """You are a robot controller. You MUST complete movement tasks.
+    TOOLS:
+    - get_robot_location(robot_id): Get position
+    - move_robot_supervisor(robot_id, target_x, target_y, speed): MOVE ROBOT (required to complete tasks!)
+    - get_door_position(): Get door coordinates
+
+    CRITICAL:
+    Getting robot locations is NOT completing the task!
+    You MUST call move_robot_supervisor to actually move robots!
+
+    WORKFLOW for "send robot to X":
+    1. get_robot_location for all robots (ONCE per robot)
+    2. Calculate which is closest
+    3. IMMEDIATELY call move_robot_supervisor to move it
+    4. STOP - do not keep checking locations
+
+    If you only get locations without moving, you FAIL the task."""
+
+
+
+client = genai.Client(api_key=GEMINI_API_KEY)
+
+
+async def llm_controlled_mission(
+    user_prompt: str,
+    system_prompt: str = system_prompt,
+    client: genai.Client = client,
+    max_turns: int = 5
+    ) -> None:
+    """
+    Multi-turn LLM execution - keeps calling until task is complete.
+    """
     tool_list = [
-        move_robot_to_position,
+        move_robot_supervisor,
         get_robot_location,
         stop_robot,
-        get_door_position,
     ]
 
     available_functions = {fn.__name__: fn for fn in tool_list}
@@ -265,113 +335,88 @@ async def llm_controlled_mission(
     config = types.GenerateContentConfig(
         system_instruction=system_prompt,
         tools=tool_list,
-        automatic_function_calling=types.AutomaticFunctionCallingConfig(
-            disable=True  # We manually execute
-        ),
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         tool_config=types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(mode='ANY')
         )
-    )
-
-    # Single LLM call
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=user_prompt,
-        config=config
     )
 
     print("\n" + "="*60)
     print("MISSION EXECUTION")
     print("="*60)
 
-    if not response.function_calls:
-        print("No tool calls returned by LLM.")
-        if response.text:
-            print(response.text)
-        return
+    # Start conversation
+    messages = [user_prompt]
+    
+    for turn in range(max_turns):
+        print(f"\n--- Turn {turn + 1} ---")
+        
+        # Call LLM with current messages
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=messages,
+            config=config
+        )
 
-    tool_results = []
+        # Check if LLM wants to call functions
+        if not response.function_calls:
+            print("No more function calls - task complete")
+            if response.text:
+                print(f"Final response: {response.text}")
+            break
 
-    # Execute ALL tool calls sequentially
-    for fn in response.function_calls:
-        function_to_call = available_functions.get(fn.name)
+        # Execute all function calls
+        tool_results = []
+        for fn in response.function_calls:
+            function_to_call = available_functions.get(fn.name)
 
-        if not function_to_call:
-            print(f"Unknown function: {fn.name}")
-            continue
+            if not function_to_call:
+                print(f"Unknown function: {fn.name}")
+                continue
 
-        print(f"\nExecuting: {fn.name}")
-        print(f"Arguments: {fn.args}")
+            print(f"\nExecuting: {fn.name}")
+            print(f"  Arguments: {fn.args}")
 
-        try:
-            result = await function_to_call(**fn.args)
-            print(f"Result: {result}")
+            try:
+                result = await function_to_call(**fn.args)
+                print(f"  ✓ Result: {result}")
 
-            tool_results.append(
-                types.Part.from_function_response(
-                    name=fn.name,
-                    response=result
+                tool_results.append(
+                    types.Part.from_function_response(
+                        name=fn.name,
+                        response=result
+                    )
                 )
-            )
 
-        except Exception as e:
-            print(f"Error: {e}")
-            tool_results.append(
-                types.Part.from_function_response(
-                    name=fn.name,
-                    response={"error": str(e)}
+            except Exception as e:
+                print(f"  ✗ Error: {e}")
+                tool_results.append(
+                    types.Part.from_function_response(
+                        name=fn.name,
+                        response={"error": str(e)}
+                    )
                 )
-            )
 
-    # Optional: one final LLM call for summary
-    final_response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=tool_results
-    )
+        # Add results to conversation
+        messages.append(tool_results)
 
     print("\n" + "="*60)
-    print("Mission complete!")
+    print("Mission Complete!")
     print("="*60)
 
-    if final_response.text:
-        print(f"\nFinal LLM response:\n{final_response.text}")
 
+async def main():
+    door_position = get_object_position_position(position=[7.75, -1.45, 0.0]).get("position")
+    window_position = get_object_position_position(position=[7.75, 0.45, 0.0]).get("position") 
+    manhole_position = get_object_position_position(position=[0, 0, 0.0]).get("position")
+
+    to_window_prompt = f"Task: Move robot 1 to position {window_position}"
+    await llm_controlled_mission(user_prompt=to_window_prompt)
+
+    to_door_prompt = f"Task: Move robot 3 to position {door_position}"
+    await llm_controlled_mission(user_prompt=to_door_prompt)
 
 
 if __name__ == "__main__":
+    asyncio.run(main())    
     
-    
-    system_prompt = """You are a robot mission controller for a rescue operation.
-    
-    You control 3 Tiago++ robots (IDs: "1", "2", "3").
-    
-    Available functions:
-    - move_robot_to_position(robot_id, target_x, target_y, speed): Move robot to coordinates. This function WAITS until the robot arrives.
-    - get_robot_location(robot_id): Get current position of a robot
-    - stop_robot(robot_id): Stop a robot immediately
-    - get_door_position(): Get the coordinates of the door
-
-    IMPORTANT:
-    - Generate the COMPLETE mission plan in a single response.
-    - Assume movement functions block until arrival.
-    - Do NOT request intermediate state checks.
-    - Call all required functions in order in one response.
-    """
-    
-
-    door_position = get_door_position()
-    target_location = door_position.get("position", [7.75, -1.45, 0.0])  # Default to known door position if API fails
-
-    user_prompt = f"""
-    Mission: Send robot 1 to the position {target_location}.
-    """
-
-    user_prompt = user_prompt.format(target_location=target_location)
-    
-    client = genai.Client(api_key=GEMINI_API_KEY)
-
-    asyncio.run(llm_controlled_mission(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        client=client
-    ))
